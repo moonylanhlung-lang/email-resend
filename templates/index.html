@@ -2,19 +2,106 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resend Email Tool</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #333;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+    h2 {
+      color: #4a5568;
+      margin-bottom: 30px;
+      font-size: 2em;
+    }
+    input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+      transition: border-color 0.3s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin: 5px;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin-top: 30px;
+    }
+    li {
+      background: #f7fafc;
+      margin: 10px 0;
+      padding: 20px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    li b {
+      color: #2d3748;
+    }
+    .resend-btn {
+      background: #48bb78;
+    }
+    .resend-btn:hover {
+      background: #38a169;
+    }
+  </style>
 </head>
 <body>
-  <h2>🔍 Tìm email merchant</h2>
+  <div class="container">
+    <h2>🔍 Tìm email merchant</h2>
 
-  <input id="email" placeholder="merchant@gmail.com">
-  <button onclick="search()">Search</button>
+    <input id="email" placeholder="merchant@gmail.com" type="email">
+    <button onclick="search()">Search</button>
 
-  <ul id="list"></ul>
+    <ul id="list"></ul>
+  </div>
 
   <script>
     async function search() {
       const email = document.getElementById("email").value;
+      if (!email) {
+        alert("Vui lòng nhập email merchant!");
+        return;
+      }
       const form = new FormData();
       form.append("merchant_email", email);
 
@@ -27,8 +114,8 @@
       data.forEach(m => {
         const li = document.createElement("li");
         li.innerHTML = `
-          <b>${m.subject}</b><br/>
-          <button onclick="resend('${m.id}')">Resend</button>
+          <div><b>${m.subject}</b></div>
+          <button class="resend-btn" onclick="resend('${m.id}')">Resend</button>
         `;
         list.appendChild(li);
       });
