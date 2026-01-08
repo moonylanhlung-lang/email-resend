@@ -159,15 +159,71 @@
             <a href="/logout" class="logout-btn">Đăng Xuất</a>
         </div>
 
-        <div class="search-section">
+        <!-- <div class="search-section">
             <input id="email" class="search-input" placeholder="merchant@gmail.com" type="email">
             <button onclick="search()" class="search-btn">Tìm Kiếm</button>
         </div>
+        <div class="search-section">
+    <input id="email" class="search-input" placeholder="merchant@gmail.com" type="email">
+    <button onclick="search()" class="search-btn">Tìm Kiếm</button>
+
+    <!-- 🔥 AUTO RESEND -->
+    <button onclick="autoResend()" class="search-btn" style="margin-top:10px;background:linear-gradient(135deg,#ff9a00,#ff6a00)">
+        🔥 Auto resend email mới nhất
+    </button>
+</div>
+
 
         <ul id="list"></ul>
     </div>
 
     <script>
+    async function search() {
+        const f = new FormData();
+        f.append("merchant_email", email.value);
+        const r = await fetch("/search", { method: "POST", body: f });
+        const d = await r.json();
+        list.innerHTML = "";
+        d.forEach((m, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${m.subject}</span>
+                <button onclick="resend('${m.id}')" class="resend-btn">Gửi Lại</button>
+            `;
+            li.style.animationDelay = `${index * 0.1}s`;
+            list.appendChild(li);
+        });
+    }
+
+    async function resend(id) {
+        const f = new FormData();
+        f.append("email_id", id);
+        f.append("merchant_email", email.value);
+        await fetch("/resend", { method: "POST", body: f });
+        alert("Đã gửi lại email!");
+    }
+
+    // 🔥 AUTO RESEND EMAIL MỚI NHẤT
+    async function autoResend() {
+        const f = new FormData();
+        f.append("merchant_email", email.value);
+
+        const r = await fetch("/auto-resend", {
+            method: "POST",
+            body: f
+        });
+
+        const d = await r.json();
+
+        if (d.status === "success") {
+            alert("Đã gửi lại email:\n" + d.resent_subject);
+        } else {
+            alert(d.message || "Không tìm thấy email");
+        }
+    }
+</script>
+
+    <!-- <script>
         async function search() {
             const f = new FormData();
             f.append("merchant_email", email.value);
@@ -191,6 +247,6 @@
             await fetch("/resend", { method: "POST", body: f });
             alert("Đã gửi lại email!");
         }
-    </script>
+    </script> -->
 </body>
 </html>
