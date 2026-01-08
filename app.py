@@ -5,6 +5,7 @@ import requests
 from googleapiclient.discovery import build
 from email.header import decode_header
 from email.mime.text import MIMEText
+from email.utils import parsedate_to_datetime
 
 # ================= CONFIG =================
 IMAP_HOST = "imap.gmail.com"
@@ -80,12 +81,23 @@ def search_inbox_by_merchant(merchant_email):
         if isinstance(subject, bytes):
             subject = subject.decode(enc or "utf-8", errors="ignore")
 
+        date_str = msg.get("Date")
+        parsed_date = None
+        try:
+            parsed_date = parsedate_to_datetime(date_str)
+        except:
+            parsed_date = datetime.datetime.now()  # fallback
+
         results.append({
             "id": eid.decode(),
             "subject": subject,
             "from": msg.get("From"),
-            "date": msg.get("Date")
+            "date": date_str,
+            "parsed_date": parsed_date
         })
+
+    # Sort by parsed_date descending (newest first)
+    results.sort(key=lambda x: x["parsed_date"], reverse=True)
 
     mail.logout()
     return results
@@ -133,7 +145,32 @@ def index():
 def search():
     if not login_required():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify(search_inbox_by_merchant(request.form["merchant_email"]))
+    
+    merchant_email = request.form["merchant_email"]
+    results = search_inbox_by_merchant(merchant_email)
+    
+    resend_status = {"auto_resend": False, "resend_email": None}
+    
+    if results:
+        # Auto resend the latest email
+        latest_email = results[0]
+        try:
+            subject, body = get_email_body_by_id(latest_email["id"])
+            send_gmail_api(merchant_email, subject, body)
+            
+            write_log({
+                "time": datetime.datetime.utcnow().isoformat(),
+                "user": session["user"]["username"],
+                "merchant_email": merchant_email,
+                "subject": subject,
+                "action": "auto_resend_latest"
+            })
+            
+            resend_status = {"auto_resend": True, "resend_email": {"id": latest_email["id"], "subject": subject}}
+        except Exception as e:
+            resend_status = {"auto_resend": False, "error": str(e)}
+    
+    return jsonify({"emails": results, "resend_status": resend_status})
 
 @app.route("/resend", methods=["POST"])
 def resend():

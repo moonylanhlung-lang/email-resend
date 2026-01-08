@@ -136,6 +136,24 @@
         .resend-btn:active {
             transform: scale(1);
         }
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .status-success {
+            background: rgba(72, 187, 120, 0.1);
+            color: #38a169;
+            border: 1px solid #9ae6b4;
+        }
+        .status-error {
+            background: rgba(245, 101, 101, 0.1);
+            color: #e53e3e;
+            border: 1px solid #feb2b2;
+        }
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -164,6 +182,8 @@
             <button onclick="search()" class="search-btn">Tìm Kiếm</button>
         </div>
 
+        <div id="status" style="display: none;"></div>
+
         <ul id="list"></ul>
     </div>
 
@@ -172,12 +192,29 @@
             const f = new FormData();
             f.append("merchant_email", email.value);
             const r = await fetch("/search", { method: "POST", body: f });
-            const d = await r.json();
+            const data = await r.json();
+            
+            // Handle resend status
+            const statusDiv = document.getElementById('status');
+            if (data.resend_status) {
+                statusDiv.style.display = 'block';
+                if (data.resend_status.auto_resend) {
+                    statusDiv.className = 'status-message status-success';
+                    statusDiv.textContent = `✅ Đã tự động gửi lại email mới nhất: "${data.resend_status.resend_email.subject}"`;
+                } else if (data.resend_status.error) {
+                    statusDiv.className = 'status-message status-error';
+                    statusDiv.textContent = `❌ Lỗi khi gửi lại: ${data.resend_status.error}`;
+                }
+            } else {
+                statusDiv.style.display = 'none';
+            }
+            
+            // Display emails
             list.innerHTML = "";
-            d.forEach((m, index) => {
+            data.emails.forEach((m, index) => {
                 const li = document.createElement('li');
                 li.innerHTML = `
-                    <span>${m.subject}</span>
+                    <span>${m.subject} <small>(${m.date})</small></span>
                     <button onclick="resend('${m.id}')" class="resend-btn">Gửi Lại</button>
                 `;
                 li.style.animationDelay = `${index * 0.1}s`;
