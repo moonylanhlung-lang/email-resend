@@ -15,6 +15,12 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 GMAIL_TOKEN = os.getenv("GMAIL_TOKEN")
 SECRET_KEY = os.getenv("SECRET_KEY", "railway-secret")
 
+if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
+    raise ValueError("EMAIL_ACCOUNT and EMAIL_PASSWORD environment variables must be set")
+
+if not GMAIL_TOKEN:
+    raise ValueError("GMAIL_TOKEN environment variable must be set")
+
 LOGIN_API = "https://cnps.vn00.vn.fastgo.cloud:9803/login"
 LOG_FILE = "logs.json"
 
@@ -68,6 +74,9 @@ def logout():
 # ================= IMAP =================
 def search_inbox_by_merchant(merchant_email):
     try:
+        if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
+            raise ValueError("IMAP credentials not configured")
+        
         mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
         mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         mail.select("INBOX")
@@ -115,6 +124,9 @@ def search_inbox_by_merchant(merchant_email):
 
 def get_email_body_by_id(email_id):
     try:
+        if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
+            raise ValueError("IMAP credentials not configured")
+        
         mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
         mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         mail.select("INBOX")
@@ -148,7 +160,11 @@ def send_gmail_api(to_email, subject, html_body):
         if not html_body or not html_body.strip():
             raise ValueError("Email body is empty")
         
-        creds = pickle.loads(base64.b64decode(GMAIL_TOKEN))
+        try:
+            creds = pickle.loads(base64.b64decode(GMAIL_TOKEN))
+        except Exception as e:
+            raise ValueError(f"Invalid GMAIL_TOKEN: {str(e)}")
+        
         service = build("gmail", "v1", credentials=creds)
 
         msg = MIMEText(html_body, "html", "utf-8")
