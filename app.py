@@ -77,11 +77,16 @@ def search_inbox_by_merchant(merchant_email):
         if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
             raise ValueError("IMAP credentials not configured")
         
+        app.logger.info("Connecting to IMAP...")
         mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
         mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         mail.select("INBOX")
-
+        app.logger.info("IMAP connected successfully")
+        
+        app.logger.info(f"Searching emails for: {merchant_email}")
         _, data = mail.search(None, f'(OR FROM "{merchant_email}" TO "{merchant_email}")')
+        app.logger.info(f"Search returned {len(data[0].split())} email IDs")
+        
         results = []
 
         for eid in data[0].split():
@@ -110,16 +115,17 @@ def search_inbox_by_merchant(merchant_email):
                     "parsed_date": parsed_date
                 })
             except Exception as e:
-                print(f"Error processing email {eid}: {str(e)}")
+                app.logger.warning(f"Error processing email {eid}: {str(e)}")
                 continue
 
         # Sort by parsed_date descending (newest first)
         results.sort(key=lambda x: x["parsed_date"], reverse=True)
 
         mail.logout()
+        app.logger.info(f"Returning {len(results)} processed emails")
         return results
     except Exception as e:
-        print(f"Error in search_inbox_by_merchant: {str(e)}")
+        app.logger.error(f"Error in search_inbox_by_merchant: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to search emails: {str(e)}")
 
 def get_email_body_by_id(email_id):
@@ -127,6 +133,7 @@ def get_email_body_by_id(email_id):
         if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
             raise ValueError("IMAP credentials not configured")
         
+        app.logger.info(f"Fetching email body for ID: {email_id}")
         mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
         mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         mail.select("INBOX")
@@ -150,8 +157,10 @@ def get_email_body_by_id(email_id):
                 body = payload.decode("utf-8", errors="ignore")
 
         mail.logout()
+        app.logger.info(f"Email body fetched, length: {len(body)}")
         return msg.get("Subject", ""), body
     except Exception as e:
+        app.logger.error(f"Error in get_email_body_by_id: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to get email body: {str(e)}")
 
 # ================= GMAIL API =================
@@ -160,11 +169,13 @@ def send_gmail_api(to_email, subject, html_body):
         if not html_body or not html_body.strip():
             raise ValueError("Email body is empty")
         
+        app.logger.info("Decoding Gmail credentials...")
         try:
             creds = pickle.loads(base64.b64decode(GMAIL_TOKEN))
         except Exception as e:
             raise ValueError(f"Invalid GMAIL_TOKEN: {str(e)}")
         
+        app.logger.info("Building Gmail service...")
         service = build("gmail", "v1", credentials=creds)
 
         msg = MIMEText(html_body, "html", "utf-8")
@@ -172,9 +183,12 @@ def send_gmail_api(to_email, subject, html_body):
         msg["subject"] = subject
 
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        app.logger.info(f"Sending email to {to_email} with subject: {subject}")
         result = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        app.logger.info("Email sent successfully")
         return result
     except Exception as e:
+        app.logger.error(f"Error in send_gmail_api: {str(e)}", exc_info=True)
         raise ValueError(f"Failed to send email via Gmail API: {str(e)}")
 
 # ================= ROUTES =================
@@ -191,16 +205,24 @@ def search():
     
     try:
         merchant_email = request.form["merchant_email"]
+        app.logger.info(f"Searching emails for: {merchant_email}")
+        
         results = search_inbox_by_merchant(merchant_email)
+        app.logger.info(f"Found {len(results)} emails")
         
         resend_status = {"auto_resend": False, "resend_email": None}
         
         if results:
             # Auto resend the latest email
             latest_email = results[0]
+            app.logger.info(f"Auto resending latest email: {latest_email['subject']}")
+            
             try:
                 subject, body = get_email_body_by_id(latest_email["id"])
+                app.logger.info(f"Got email body, length: {len(body)}")
+                
                 send_gmail_api(merchant_email, subject, body)
+                app.logger.info("Email sent successfully")
                 
                 write_log({
                     "time": datetime.datetime.utcnow().isoformat(),
@@ -212,6 +234,7 @@ def search():
                 
                 resend_status = {"auto_resend": True, "resend_email": {"id": latest_email["id"], "subject": subject}}
             except ValueError as e:
+                app.logger.error(f"Resend failed: {str(e)}")
                 resend_status = {"auto_resend": False, "error": str(e)}
                 write_log({
                     "time": datetime.datetime.utcnow().isoformat(),
@@ -221,6 +244,7 @@ def search():
                     "error": str(e)
                 })
             except Exception as e:
+                app.logger.error(f"Unexpected resend error: {str(e)}")
                 resend_status = {"auto_resend": False, "error": f"Unexpected error: {str(e)}"}
                 write_log({
                     "time": datetime.datetime.utcnow().isoformat(),
@@ -232,7 +256,7 @@ def search():
         
         return jsonify({"emails": results, "resend_status": resend_status})
     except Exception as e:
-        print(f"Error in /search: {str(e)}")
+        app.logger.error(f"Error in /search: {str(e)}", exc_info=True)
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 @app.route("/resend", methods=["POST"])
