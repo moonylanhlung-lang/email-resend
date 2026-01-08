@@ -1,33 +1,196 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Resend Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            animation: slideIn 0.8s ease-in-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        h3 {
+            margin: 0;
+            color: #4a5568;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .logout-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
+        }
+        .search-section {
+            margin-bottom: 30px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: #f093fb;
+            box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+        }
+        .search-btn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(240, 147, 251, 0.3);
+        }
+        .search-btn:active {
+            transform: translateY(0);
+        }
+        #list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #list li {
+            background: #f8f9fa;
+            margin-bottom: 15px;
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.5s ease-in-out;
+            animation-fill-mode: both;
+        }
+        #list li:nth-child(1) { animation-delay: 0.1s; }
+        #list li:nth-child(2) { animation-delay: 0.2s; }
+        #list li:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #list li:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        .resend-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .resend-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(78, 205, 196, 0.3);
+        }
+        .resend-btn:active {
+            transform: scale(1);
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            #list li {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
 <body>
-<h3>Xin chào {{user.name}}</h3>
-<a href="/logout">Logout</a>
-<hr>
+    <div class="container">
+        <div class="header">
+            <h3>Xin chào {{ user.name }}</h3>
+            <a href="/logout" class="logout-btn">Đăng Xuất</a>
+        </div>
 
-<input id="email" placeholder="merchant@gmail.com">
-<button onclick="search()">Search</button>
-<ul id="list"></ul>
+        <div class="search-section">
+            <input id="email" class="search-input" placeholder="merchant@gmail.com" type="email">
+            <button onclick="search()" class="search-btn">Tìm Kiếm</button>
+        </div>
 
-<script>
-async function search() {
-  const f = new FormData()
-  f.append("merchant_email", email.value)
-  const r = await fetch("/search", {method:"POST", body:f})
-  const d = await r.json()
-  list.innerHTML=""
-  d.forEach(m=>{
-    list.innerHTML+=`<li>${m.subject}
-    <button onclick="resend('${m.id}')">Resend</button></li>`
-  })
-}
-async function resend(id){
-  const f=new FormData()
-  f.append("email_id",id)
-  f.append("merchant_email",email.value)
-  await fetch("/resend",{method:"POST",body:f})
-  alert("Đã gửi lại")
-}
-</script>
+        <ul id="list"></ul>
+    </div>
+
+    <script>
+        async function search() {
+            const f = new FormData();
+            f.append("merchant_email", email.value);
+            const r = await fetch("/search", { method: "POST", body: f });
+            const d = await r.json();
+            list.innerHTML = "";
+            d.forEach((m, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span>${m.subject}</span>
+                    <button onclick="resend('${m.id}')" class="resend-btn">Gửi Lại</button>
+                `;
+                li.style.animationDelay = `${index * 0.1}s`;
+                list.appendChild(li);
+            });
+        }
+        async function resend(id) {
+            const f = new FormData();
+            f.append("email_id", id);
+            f.append("merchant_email", email.value);
+            await fetch("/resend", { method: "POST", body: f });
+            alert("Đã gửi lại email!");
+        }
+    </script>
 </body>
 </html>
