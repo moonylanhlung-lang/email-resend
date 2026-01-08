@@ -103,36 +103,52 @@ def search_inbox_by_merchant(merchant_email):
     return results
 
 def get_email_body_by_id(email_id):
-    mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
-    mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
-    mail.select("INBOX")
+    try:
+        mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
+        mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
+        mail.select("INBOX")
 
-    _, msg_data = mail.fetch(email_id.encode(), "(RFC822)")
-    msg = email.message_from_bytes(msg_data[0][1])
-    body = ""
+        _, msg_data = mail.fetch(email_id.encode(), "(RFC822)")
+        if not msg_data or not msg_data[0] or not msg_data[0][1]:
+            raise ValueError("Email not found or empty")
+        msg = email.message_from_bytes(msg_data[0][1])
+        body = ""
 
-    if msg.is_multipart():
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                body = part.get_payload(decode=True).decode("utf-8", errors="ignore")
-                break
-    else:
-        body = msg.get_payload(decode=True).decode("utf-8", errors="ignore")
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == "text/html":
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode("utf-8", errors="ignore")
+                    break
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                body = payload.decode("utf-8", errors="ignore")
 
-    mail.logout()
-    return msg.get("Subject", ""), body
+        mail.logout()
+        return msg.get("Subject", ""), body
+    except Exception as e:
+        raise ValueError(f"Failed to get email body: {str(e)}")
 
 # ================= GMAIL API =================
 def send_gmail_api(to_email, subject, html_body):
-    creds = pickle.loads(base64.b64decode(GMAIL_TOKEN))
-    service = build("gmail", "v1", credentials=creds)
+    try:
+        if not html_body or not html_body.strip():
+            raise ValueError("Email body is empty")
+        
+        creds = pickle.loads(base64.b64decode(GMAIL_TOKEN))
+        service = build("gmail", "v1", credentials=creds)
 
-    msg = MIMEText(html_body, "html", "utf-8")
-    msg["to"] = to_email
-    msg["subject"] = subject
+        msg = MIMEText(html_body, "html", "utf-8")
+        msg["to"] = to_email
+        msg["subject"] = subject
 
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        result = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        return result
+    except Exception as e:
+        raise ValueError(f"Failed to send email via Gmail API: {str(e)}")
 
 # ================= ROUTES =================
 @app.route("/")
@@ -167,8 +183,24 @@ def search():
             })
             
             resend_status = {"auto_resend": True, "resend_email": {"id": latest_email["id"], "subject": subject}}
-        except Exception as e:
+        except ValueError as e:
             resend_status = {"auto_resend": False, "error": str(e)}
+            write_log({
+                "time": datetime.datetime.utcnow().isoformat(),
+                "user": session["user"]["username"],
+                "merchant_email": merchant_email,
+                "action": "auto_resend_failed",
+                "error": str(e)
+            })
+        except Exception as e:
+            resend_status = {"auto_resend": False, "error": f"Unexpected error: {str(e)}"}
+            write_log({
+                "time": datetime.datetime.utcnow().isoformat(),
+                "user": session["user"]["username"],
+                "merchant_email": merchant_email,
+                "action": "auto_resend_failed",
+                "error": str(e)
+            })
     
     return jsonify({"emails": results, "resend_status": resend_status})
 
@@ -179,17 +211,37 @@ def resend():
 
     email_id = request.form["email_id"]
     merchant_email = request.form["merchant_email"]
-    subject, body = get_email_body_by_id(email_id)
-    send_gmail_api(merchant_email, subject, body)
+    
+    try:
+        subject, body = get_email_body_by_id(email_id)
+        send_gmail_api(merchant_email, subject, body)
 
-    write_log({
-        "time": datetime.datetime.utcnow().isoformat(),
-        "user": session["user"]["username"],
-        "merchant_email": merchant_email,
-        "subject": subject
-    })
+        write_log({
+            "time": datetime.datetime.utcnow().isoformat(),
+            "user": session["user"]["username"],
+            "merchant_email": merchant_email,
+            "subject": subject
+        })
 
-    return jsonify({"status": "success"})
+        return jsonify({"status": "success"})
+    except ValueError as e:
+        write_log({
+            "time": datetime.datetime.utcnow().isoformat(),
+            "user": session["user"]["username"],
+            "merchant_email": merchant_email,
+            "action": "resend_failed",
+            "error": str(e)
+        })
+        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        write_log({
+            "time": datetime.datetime.utcnow().isoformat(),
+            "user": session["user"]["username"],
+            "merchant_email": merchant_email,
+            "action": "resend_failed",
+            "error": str(e)
+        })
+        return jsonify({"status": "error", "message": f"Unexpected error: {str(e)}"}), 500
 
 @app.route("/logs")
 def logs():
