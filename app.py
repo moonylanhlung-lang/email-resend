@@ -67,40 +67,51 @@ def logout():
 
 # ================= IMAP =================
 def search_inbox_by_merchant(merchant_email):
-    mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
-    mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
-    mail.select("INBOX")
+    try:
+        mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
+        mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
+        mail.select("INBOX")
 
-    _, data = mail.search(None, f'(OR FROM "{merchant_email}" TO "{merchant_email}")')
-    results = []
+        _, data = mail.search(None, f'(OR FROM "{merchant_email}" TO "{merchant_email}")')
+        results = []
 
-    for eid in data[0].split():
-        _, msg_data = mail.fetch(eid, "(RFC822)")
-        msg = email.message_from_bytes(msg_data[0][1])
-        subject, enc = decode_header(msg.get("Subject", ""))[0]
-        if isinstance(subject, bytes):
-            subject = subject.decode(enc or "utf-8", errors="ignore")
+        for eid in data[0].split():
+            try:
+                _, msg_data = mail.fetch(eid, "(RFC822)")
+                msg = email.message_from_bytes(msg_data[0][1])
+                subject, enc = decode_header(msg.get("Subject", ""))[0]
+                if isinstance(subject, bytes):
+                    subject = subject.decode(enc or "utf-8", errors="ignore")
 
-        date_str = msg.get("Date")
-        parsed_date = None
-        try:
-            parsed_date = parsedate_to_datetime(date_str)
-        except:
-            parsed_date = datetime.datetime.now()  # fallback
+                date_str = msg.get("Date")
+                parsed_date = None
+                if date_str:
+                    try:
+                        parsed_date = parsedate_to_datetime(date_str)
+                    except:
+                        parsed_date = datetime.datetime.now()  # fallback
+                else:
+                    parsed_date = datetime.datetime.now()  # fallback
 
-        results.append({
-            "id": eid.decode(),
-            "subject": subject,
-            "from": msg.get("From"),
-            "date": date_str,
-            "parsed_date": parsed_date
-        })
+                results.append({
+                    "id": eid.decode(),
+                    "subject": subject,
+                    "from": msg.get("From"),
+                    "date": date_str or "Unknown",
+                    "parsed_date": parsed_date
+                })
+            except Exception as e:
+                print(f"Error processing email {eid}: {str(e)}")
+                continue
 
-    # Sort by parsed_date descending (newest first)
-    results.sort(key=lambda x: x["parsed_date"], reverse=True)
+        # Sort by parsed_date descending (newest first)
+        results.sort(key=lambda x: x["parsed_date"], reverse=True)
 
-    mail.logout()
-    return results
+        mail.logout()
+        return results
+    except Exception as e:
+        print(f"Error in search_inbox_by_merchant: {str(e)}")
+        raise ValueError(f"Failed to search emails: {str(e)}")
 
 def get_email_body_by_id(email_id):
     try:
@@ -162,47 +173,51 @@ def search():
     if not login_required():
         return jsonify({"error": "unauthorized"}), 401
     
-    merchant_email = request.form["merchant_email"]
-    results = search_inbox_by_merchant(merchant_email)
-    
-    resend_status = {"auto_resend": False, "resend_email": None}
-    
-    if results:
-        # Auto resend the latest email
-        latest_email = results[0]
-        try:
-            subject, body = get_email_body_by_id(latest_email["id"])
-            send_gmail_api(merchant_email, subject, body)
-            
-            write_log({
-                "time": datetime.datetime.utcnow().isoformat(),
-                "user": session["user"]["username"],
-                "merchant_email": merchant_email,
-                "subject": subject,
-                "action": "auto_resend_latest"
-            })
-            
-            resend_status = {"auto_resend": True, "resend_email": {"id": latest_email["id"], "subject": subject}}
-        except ValueError as e:
-            resend_status = {"auto_resend": False, "error": str(e)}
-            write_log({
-                "time": datetime.datetime.utcnow().isoformat(),
-                "user": session["user"]["username"],
-                "merchant_email": merchant_email,
-                "action": "auto_resend_failed",
-                "error": str(e)
-            })
-        except Exception as e:
-            resend_status = {"auto_resend": False, "error": f"Unexpected error: {str(e)}"}
-            write_log({
-                "time": datetime.datetime.utcnow().isoformat(),
-                "user": session["user"]["username"],
-                "merchant_email": merchant_email,
-                "action": "auto_resend_failed",
-                "error": str(e)
-            })
-    
-    return jsonify({"emails": results, "resend_status": resend_status})
+    try:
+        merchant_email = request.form["merchant_email"]
+        results = search_inbox_by_merchant(merchant_email)
+        
+        resend_status = {"auto_resend": False, "resend_email": None}
+        
+        if results:
+            # Auto resend the latest email
+            latest_email = results[0]
+            try:
+                subject, body = get_email_body_by_id(latest_email["id"])
+                send_gmail_api(merchant_email, subject, body)
+                
+                write_log({
+                    "time": datetime.datetime.utcnow().isoformat(),
+                    "user": session["user"]["username"],
+                    "merchant_email": merchant_email,
+                    "subject": subject,
+                    "action": "auto_resend_latest"
+                })
+                
+                resend_status = {"auto_resend": True, "resend_email": {"id": latest_email["id"], "subject": subject}}
+            except ValueError as e:
+                resend_status = {"auto_resend": False, "error": str(e)}
+                write_log({
+                    "time": datetime.datetime.utcnow().isoformat(),
+                    "user": session["user"]["username"],
+                    "merchant_email": merchant_email,
+                    "action": "auto_resend_failed",
+                    "error": str(e)
+                })
+            except Exception as e:
+                resend_status = {"auto_resend": False, "error": f"Unexpected error: {str(e)}"}
+                write_log({
+                    "time": datetime.datetime.utcnow().isoformat(),
+                    "user": session["user"]["username"],
+                    "merchant_email": merchant_email,
+                    "action": "auto_resend_failed",
+                    "error": str(e)
+                })
+        
+        return jsonify({"emails": results, "resend_status": resend_status})
+    except Exception as e:
+        print(f"Error in /search: {str(e)}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 @app.route("/resend", methods=["POST"])
 def resend():
