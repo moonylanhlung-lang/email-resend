@@ -189,27 +189,60 @@ def search():
     return jsonify(search_inbox_by_merchant(request.form["merchant_email"]))
 
 
+# @app.route("/resend", methods=["POST"])
+# def resend():
+#     if not login_required():
+#         return jsonify({"error": "unauthorized"}), 401
+
+#     email_id = request.form["email_id"]
+#     merchant_email = request.form["merchant_email"]
+#     subject, body = get_email_body_by_id(email_id)
+#     send_gmail_api(merchant_email, subject, body)
+
+#     write_log(
+#         {
+#             "time": datetime.datetime.utcnow().isoformat(),
+#             "user": session["user"]["username"],
+#             "merchant_email": merchant_email,
+#             "subject": subject,
+#         }
+#     )
+
+#     return jsonify({"status": "success"})
 @app.route("/resend", methods=["POST"])
 def resend():
-    if not login_required():
-        return jsonify({"error": "unauthorized"}), 401
+    try:
+        email_id = request.form.get("email_id")
+        merchant_email = request.form.get("merchant_email")
 
-    email_id = request.form["email_id"]
-    merchant_email = request.form["merchant_email"]
-    subject, body = get_email_body_by_id(email_id)
-    send_gmail_api(merchant_email, subject, body)
+        if not email_id or not merchant_email:
+            return jsonify({
+                "status": "error",
+                "message": "Missing email_id or merchant_email"
+            }), 400
 
-    write_log(
-        {
-            "time": datetime.datetime.utcnow().isoformat(),
-            "user": session["user"]["username"],
-            "merchant_email": merchant_email,
-            "subject": subject,
-        }
-    )
+        subject, body = get_email_body_by_id(email_id)
 
-    return jsonify({"status": "success"})
+        send_gmail_api(
+            to_email=merchant_email,
+            subject=subject,
+            html_body=body
+        )
 
+        save_log(
+            user=session.get("user", "unknown"),
+            merchant_email=merchant_email,
+            subject=subject
+        )
+
+        return jsonify({"status": "success"})
+
+    except Exception as e:
+        print("❌ RESEND ERROR:", e)
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route("/auto-resend", methods=["POST"])
 def auto_resend():
@@ -243,14 +276,28 @@ def auto_resend():
     )
 
 
-@app.route("/logs")
-def logs():
-    if not login_required():
-        return redirect("/login")
-    if not os.path.exists(LOG_FILE):
-        return jsonify([])
-    with open(LOG_FILE) as f:
-        return jsonify(json.load(f))
+# @app.route("/logs")
+# def logs():
+#     if not login_required():
+#         return redirect("/login")
+#     if not os.path.exists(LOG_FILE):
+#         return jsonify([])
+#     with open(LOG_FILE) as f:
+#         return jsonify(json.load(f))
+@app.route("/logs", methods=["GET"])
+def get_logs():
+    try:
+        if not os.path.exists(LOG_FILE):
+            return jsonify([])
+
+        with open(LOG_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+
+        return jsonify(logs)
+
+    except Exception as e:
+        print("❌ LOG ERROR:", e)
+        return jsonify([]), 500
 
 
 # ================= MAIN =================
