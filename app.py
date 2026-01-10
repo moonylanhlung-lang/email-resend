@@ -5,6 +5,7 @@ import requests
 from googleapiclient.discovery import build
 from email.header import decode_header
 from email.mime.text import MIMEText
+from email.utils import parsedate_to_datetime
 
 # ================= CONFIG =================
 IMAP_HOST = "imap.gmail.com"
@@ -20,9 +21,11 @@ LOG_FILE = "logs.json"
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
+
 # ================= UTILS =================
 def login_required():
     return "user" in session
+
 
 def write_log(data):
     logs = []
@@ -32,6 +35,7 @@ def write_log(data):
     logs.append(data)
     with open(LOG_FILE, "w") as f:
         json.dump(logs, f, indent=2, ensure_ascii=False)
+
 
 # ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
@@ -46,7 +50,7 @@ def login():
         LOGIN_API,
         json={"username": username, "password": password},
         headers={"content-type": "application/json"},
-        timeout=10
+        timeout=10,
     )
 
     data = resp.json()
@@ -54,15 +58,17 @@ def login():
         session["user"] = {
             "username": data["data"]["username"],
             "name": data["data"]["name"],
-            "token": data["data"]["token"]
+            "token": data["data"]["token"],
         }
         return redirect("/")
     return render_template("login.html", error="Sai tài khoản hoặc mật khẩu")
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
+
 
 # ================= IMAP =================
 def search_inbox_by_merchant(merchant_email):
@@ -71,24 +77,68 @@ def search_inbox_by_merchant(merchant_email):
     mail.select("INBOX")
 
     _, data = mail.search(None, f'(OR FROM "{merchant_email}" TO "{merchant_email}")')
+
     results = []
 
     for eid in data[0].split():
         _, msg_data = mail.fetch(eid, "(RFC822)")
         msg = email.message_from_bytes(msg_data[0][1])
+
         subject, enc = decode_header(msg.get("Subject", ""))[0]
         if isinstance(subject, bytes):
             subject = subject.decode(enc or "utf-8", errors="ignore")
 
-        results.append({
-            "id": eid.decode(),
-            "subject": subject,
-            "from": msg.get("From"),
-            "date": msg.get("Date")
-        })
+        # 🔑 Parse Date → datetime
+        date_raw = msg.get("Date")
+        try:
+            date_obj = parsedate_to_datetime(date_raw)
+        except:
+            date_obj = None
+
+        results.append(
+            {
+                "id": eid.decode(),
+                "subject": subject,
+                "from": msg.get("From"),
+                "date": date_raw,
+                "date_obj": date_obj,
+            }
+        )
 
     mail.logout()
+
+    # 🔥 SORT: email mới nhất lên đầu
+    results = [r for r in results if r["date_obj"]]
+    results.sort(key=lambda x: x["date_obj"], reverse=True)
+
     return results
+
+
+# def search_inbox_by_merchant(merchant_email):
+#     mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
+#     mail.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
+#     mail.select("INBOX")
+
+#     _, data = mail.search(None, f'(OR FROM "{merchant_email}" TO "{merchant_email}")')
+#     results = []
+
+#     for eid in data[0].split():
+#         _, msg_data = mail.fetch(eid, "(RFC822)")
+#         msg = email.message_from_bytes(msg_data[0][1])
+#         subject, enc = decode_header(msg.get("Subject", ""))[0]
+#         if isinstance(subject, bytes):
+#             subject = subject.decode(enc or "utf-8", errors="ignore")
+
+#         results.append({
+#             "id": eid.decode(),
+#             "subject": subject,
+#             "from": msg.get("From"),
+#             "date": msg.get("Date")
+#         })
+
+#     mail.logout()
+#     return results
+
 
 def get_email_body_by_id(email_id):
     mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
@@ -110,6 +160,7 @@ def get_email_body_by_id(email_id):
     mail.logout()
     return msg.get("Subject", ""), body
 
+
 # ================= GMAIL API =================
 def send_gmail_api(to_email, subject, html_body):
     creds = pickle.loads(base64.b64decode(GMAIL_TOKEN))
@@ -122,6 +173,7 @@ def send_gmail_api(to_email, subject, html_body):
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
+
 # ================= ROUTES =================
 @app.route("/")
 def index():
@@ -129,11 +181,13 @@ def index():
         return redirect("/login")
     return render_template("index.html", user=session["user"])
 
+
 @app.route("/search", methods=["POST"])
 def search():
     if not login_required():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify(search_inbox_by_merchant(request.form["merchant_email"]))
+
 
 @app.route("/resend", methods=["POST"])
 def resend():
@@ -145,14 +199,49 @@ def resend():
     subject, body = get_email_body_by_id(email_id)
     send_gmail_api(merchant_email, subject, body)
 
-    write_log({
-        "time": datetime.datetime.utcnow().isoformat(),
-        "user": session["user"]["username"],
-        "merchant_email": merchant_email,
-        "subject": subject
-    })
+    write_log(
+        {
+            "time": datetime.datetime.utcnow().isoformat(),
+            "user": session["user"]["username"],
+            "merchant_email": merchant_email,
+            "subject": subject,
+        }
+    )
 
     return jsonify({"status": "success"})
+
+
+@app.route("/auto-resend", methods=["POST"])
+def auto_resend():
+    if not login_required():
+        return jsonify({"error": "unauthorized"}), 401
+
+    merchant_email = request.form["merchant_email"]
+
+    emails = search_inbox_by_merchant(merchant_email)
+
+    if not emails:
+        return jsonify({"status": "no_email", "message": "Không tìm thấy email"})
+
+    latest = emails[0]  # 🔥 email mới nhất
+
+    subject, body = get_email_body_by_id(latest["id"])
+    send_gmail_api(merchant_email, subject, body)
+
+    write_log(
+        {
+            "time": datetime.datetime.utcnow().isoformat(),
+            "user": session["user"]["username"],
+            "merchant_email": merchant_email,
+            "subject": subject,
+            "auto": True,
+        }
+    )
+
+    return jsonify(
+        {"status": "success", "resent_subject": subject, "date": latest["date"]}
+    )
+
 
 @app.route("/logs")
 def logs():
@@ -162,6 +251,7 @@ def logs():
         return jsonify([])
     with open(LOG_FILE) as f:
         return jsonify(json.load(f))
+
 
 # ================= MAIN =================
 if __name__ == "__main__":

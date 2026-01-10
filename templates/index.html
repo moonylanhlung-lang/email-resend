@@ -158,9 +158,25 @@
             <h3>Xin chào {{ user.name }}</h3>
             <a href="/logout" class="logout-btn">Đăng Xuất</a>
         </div>
-      
+        <div id="toast" style="
+    display:none;
+    position:fixed;
+    top:20px;
+    right:20px;
+    background:#2ecc71;
+    color:white;
+    padding:15px 20px;
+    border-radius:8px;
+    box-shadow:0 10px 25px rgba(0,0,0,.2);
+    z-index:9999;
+">
+</div>
         <div class="search-section">
-    <input id="email" class="search-input" placeholder="merchant@gmail.com" type="email">
+     <textarea id="email" class="search-input"
+ placeholder="merchant1@gmail.com
+merchant2@gmail.com
+merchant3@gmail.com"
+ rows="4"></textarea>
     <button onclick="search()" class="search-btn">Tìm Kiếm</button>
 
     <!-- 🔥 AUTO RESEND -->
@@ -168,11 +184,10 @@
         🔥 Auto resend email mới nhất
     </button>
 </div>
-
 </div>
-
-
         <ul id="list"></ul>
+        <h4 style="margin-top:30px;">📜 Lịch sử resend</h4>
+<ul id="log-list"></ul>
     </div>
 
     <script>
@@ -198,13 +213,24 @@
         f.append("email_id", id);
         f.append("merchant_email", email.value);
         await fetch("/resend", { method: "POST", body: f });
-        alert("Đã gửi lại email!");
+        showAlert("✅ Đã gửi lại email");
+        loadLogs();
     }
+    let autoBtn;
 
-    // 🔥 AUTO RESEND EMAIL MỚI NHẤT
     async function autoResend() {
+    autoBtn = event.target;
+    autoBtn.disabled = true;
+    autoBtn.innerText = "⏳ Đang gửi...";
+
+    const emails = email.value
+        .split("\n")
+        .map(e => e.trim())
+        .filter(e => e);
+
+    for (const m of emails) {
         const f = new FormData();
-        f.append("merchant_email", email.value);
+        f.append("merchant_email", m);
 
         const r = await fetch("/auto-resend", {
             method: "POST",
@@ -214,37 +240,72 @@
         const d = await r.json();
 
         if (d.status === "success") {
-            alert("Đã gửi lại email:\n" + d.resent_subject);
+            showAlert(`✅ ${m}\n${d.resent_subject}`, 3000);
         } else {
-            alert(d.message || "Không tìm thấy email");
+            showAlert(`❌ ${m}: ${d.message}`, 4000);
         }
     }
-</script>
 
-    <!-- <script>
-        async function search() {
-            const f = new FormData();
-            f.append("merchant_email", email.value);
-            const r = await fetch("/search", { method: "POST", body: f });
-            const d = await r.json();
-            list.innerHTML = "";
-            d.forEach((m, index) => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <span>${m.subject}</span>
-                    <button onclick="resend('${m.id}')" class="resend-btn">Gửi Lại</button>
-                `;
-                li.style.animationDelay = `${index * 0.1}s`;
-                list.appendChild(li);
-            });
-        }
-        async function resend(id) {
-            const f = new FormData();
-            f.append("email_id", id);
-            f.append("merchant_email", email.value);
-            await fetch("/resend", { method: "POST", body: f });
-            alert("Đã gửi lại email!");
-        }
-    </script> -->
+    autoBtn.disabled = false;
+    autoBtn.innerText = "🔥 Auto resend email mới nhất";
+    loadLogs();
+    }
+
+    //  async function autoResend() {
+    // autoBtn = event.target;
+    // autoBtn.disabled = true;
+    // autoBtn.innerText = "⏳ Đang gửi...";
+
+    // const f = new FormData();
+    // f.append("merchant_email", email.value);
+
+    // const r = await fetch("/auto-resend", {
+    //     method: "POST",
+    //     body: f
+    // });
+
+    // const d = await r.json();
+
+    // autoBtn.disabled = false;
+    // autoBtn.innerText = "🔥 Auto resend email mới nhất";
+
+    if (d.status === "success") {
+        showAlert(`Đã gửi lại email:\n${d.resent_subject}`);
+        loadLogs();
+    } else {
+        showAlert(d.message || "Không tìm thấy email");
+    }
+    }
+    function showAlert(msg, duration = 10000) {
+    const toast = document.getElementById("toast");
+    toast.innerText = msg;
+    toast.style.display = "block";
+
+    setTimeout(() => {
+        toast.style.display = "none";
+    }, duration);
+}
+
+async function loadLogs() {
+    const r = await fetch("/logs");
+    const d = await r.json();
+    const logList = document.getElementById("log-list");
+    logList.innerHTML = "";
+
+    d.slice(-10).reverse().forEach(l => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+            <small>
+                ⏱ ${new Date(l.time).toLocaleString()} <br>
+                👤 ${l.user} <br>
+                📧 ${l.merchant_email} <br>
+                📨 ${l.subject}
+            </small>
+        `;
+        logList.appendChild(li);
+    });
+}
+loadLogs();
+    </script>
 </body>
 </html>
