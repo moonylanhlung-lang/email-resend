@@ -1,164 +1,87 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Resend Dashboard</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            color: #333;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
-            animation: slideIn 0.8s ease-in-out;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        h3 {
-            margin: 0;
-            color: #4a5568;
-            font-size: 28px;
-            font-weight: 600;
-        }
-        .logout-btn {
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        .logout-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3);
-        }
-        .search-section {
-            margin-bottom: 30px;
-        }
-        .search-input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
-            outline: none;
-        }
-        .search-input:focus {
-            border-color: #f093fb;
-            box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
-        }
-        .search-btn {
-            padding: 15px 30px;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .search-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(240, 147, 251, 0.3);
-        }
-        .search-btn:active {
-            transform: translateY(0);
-        }
-        #list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        #list li {
-            background: #f8f9fa;
-            margin-bottom: 15px;
-            padding: 20px;
-            border-radius: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
-            animation: fadeInUp 0.5s ease-in-out;
-            animation-fill-mode: both;
-        }
-        #list li:nth-child(1) { animation-delay: 0.1s; }
-        #list li:nth-child(2) { animation-delay: 0.2s; }
-        #list li:nth-child(3) { animation-delay: 0.3s; }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        #list li:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-        }
-        .resend-btn {
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .resend-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 15px rgba(78, 205, 196, 0.3);
-        }
-        .resend-btn:active {
-            transform: scale(1);
-        }
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px;
-            }
-            .header {
-                flex-direction: column;
-                gap: 15px;
-            }
-            #list li {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h3>Xin chào {{ user.name }}</h3>
-            <a href="/logout" class="logout-btn">Đăng Xuất</a>
-        </div>
-        <div id="toast" style="
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Resend Dashboard</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    background: rgba(255,255,255,.95);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 15px 35px rgba(0,0,0,.1);
+}
+
+.header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:2px solid #eee;
+    padding-bottom:15px;
+    margin-bottom:25px;
+}
+
+.search-input {
+    width:100%;
+    padding:15px;
+    border-radius:10px;
+    border:2px solid #ddd;
+    font-size:15px;
+}
+
+.search-btn {
+    margin-top:10px;
+    padding:14px 25px;
+    border:none;
+    border-radius:10px;
+    font-weight:600;
+    cursor:pointer;
+    color:#fff;
+    background:linear-gradient(135deg,#f093fb,#f5576c);
+}
+
+.search-btn[disabled] {
+    opacity:.6;
+    cursor:not-allowed;
+}
+
+.resend-btn {
+    padding:8px 14px;
+    border:none;
+    border-radius:6px;
+    background:linear-gradient(135deg,#4ecdc4,#44a08d);
+    color:#fff;
+    cursor:pointer;
+}
+
+ul {
+    list-style:none;
+    padding:0;
+}
+
+li {
+    background:#f7f7f7;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+/* Toast */
+#toast {
     display:none;
     position:fixed;
     top:20px;
@@ -169,143 +92,131 @@
     border-radius:8px;
     box-shadow:0 10px 25px rgba(0,0,0,.2);
     z-index:9999;
-">
-</div>
-        <div class="search-section">
-     <textarea id="email" class="search-input"
- placeholder="merchant1@gmail.com
-merchant2@gmail.com
-merchant3@gmail.com"
- rows="4"></textarea>
-    <button onclick="search()" class="search-btn">Tìm Kiếm</button>
+}
+</style>
+</head>
 
-    <!-- 🔥 AUTO RESEND -->
-    <button onclick="autoResend()" class="search-btn" style="margin-top:10px;background:linear-gradient(135deg,#ff9a00,#ff6a00)">
-        🔥 Auto resend email mới nhất
-    </button>
-</div>
-</div>
-        <ul id="list"></ul>
-        <h4 style="margin-top:30px;">📜 Lịch sử resend</h4>
-<ul id="log-list"></ul>
+<body>
+
+<div id="toast"></div>
+
+<div class="container">
+
+    <div class="header">
+        <h3>📧 Email Resend Dashboard</h3>
+        <a href="/logout">Đăng xuất</a>
     </div>
 
-    <script>
-    async function search() {
-        const f = new FormData();
-        f.append("merchant_email", email.value);
-        const r = await fetch("/search", { method: "POST", body: f });
-        const d = await r.json();
-        list.innerHTML = "";
-        d.forEach((m, index) => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span>${m.subject}</span>
-                <button onclick="resend('${m.id}')" class="resend-btn">Gửi Lại</button>
-            `;
-            li.style.animationDelay = `${index * 0.1}s`;
-            list.appendChild(li);
-        });
-    }
+    <textarea id="email" class="search-input" rows="4"
+placeholder="merchant1@gmail.com
+merchant2@gmail.com"></textarea>
 
-    async function resend(id) {
-        const f = new FormData();
-        f.append("email_id", id);
-        f.append("merchant_email", email.value);
-        await fetch("/resend", { method: "POST", body: f });
-        showAlert("✅ Đã gửi lại email");
-        loadLogs();
-    }
-    let autoBtn;
+    <button class="search-btn" onclick="search()">🔍 Tìm email</button>
 
-    async function autoResend() {
-    autoBtn = event.target;
-    autoBtn.disabled = true;
-    autoBtn.innerText = "⏳ Đang gửi...";
+    <button id="autoBtn" class="search-btn"
+        style="background:linear-gradient(135deg,#ff9a00,#ff6a00)"
+        onclick="autoResend()">
+        🔥 Auto resend email mới nhất
+    </button>
 
-    const emails = email.value
-        .split("\n")
-        .map(e => e.trim())
-        .filter(e => e);
+    <h4 style="margin-top:30px;">📨 Email tìm được</h4>
+    <ul id="list"></ul>
+
+    <h4 style="margin-top:30px;">📜 Lịch sử resend</h4>
+    <ul id="log-list"></ul>
+
+</div>
+
+<script>
+function showToast(msg, time = 10000, color = "#2ecc71") {
+    const toast = document.getElementById("toast");
+    toast.style.background = color;
+    toast.innerText = msg;
+    toast.style.display = "block";
+    setTimeout(() => toast.style.display = "none", time);
+}
+
+async function search() {
+    const emails = email.value.split("\n").map(e=>e.trim()).filter(e=>e);
+    list.innerHTML = "";
 
     for (const m of emails) {
         const f = new FormData();
         f.append("merchant_email", m);
 
-        const r = await fetch("/auto-resend", {
-            method: "POST",
-            body: f
-        });
+        const r = await fetch("/search", { method:"POST", body:f });
+        const d = await r.json();
 
+        d.forEach(mail => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+                <span>${mail.subject}</span>
+                <button class="resend-btn"
+                    onclick="manualResend('${mail.id}','${m}')">
+                    Gửi lại
+                </button>`;
+            list.appendChild(li);
+        });
+    }
+}
+
+async function manualResend(id, merchant) {
+    const f = new FormData();
+    f.append("email_id", id);
+    f.append("merchant_email", merchant);
+
+    await fetch("/resend", { method:"POST", body:f });
+    showToast("✅ Đã resend email");
+    loadLogs();
+}
+
+async function autoResend() {
+    const btn = document.getElementById("autoBtn");
+    btn.disabled = true;
+    btn.innerText = "⏳ Đang gửi...";
+
+    const emails = email.value.split("\n").map(e=>e.trim()).filter(e=>e);
+
+    for (const m of emails) {
+        const f = new FormData();
+        f.append("merchant_email", m);
+
+        const r = await fetch("/auto-resend", { method:"POST", body:f });
         const d = await r.json();
 
         if (d.status === "success") {
-            showAlert(`✅ ${m}\n${d.resent_subject}`, 3000);
+            showToast(`✅ ${m}\n${d.resent_subject}`, 4000);
         } else {
-            showAlert(`❌ ${m}: ${d.message}`, 4000);
+            showToast(`❌ ${m}: ${d.message}`, 5000, "#e74c3c");
         }
     }
 
-    autoBtn.disabled = false;
-    autoBtn.innerText = "🔥 Auto resend email mới nhất";
+    btn.disabled = false;
+    btn.innerText = "🔥 Auto resend email mới nhất";
     loadLogs();
-    }
-
-    //  async function autoResend() {
-    // autoBtn = event.target;
-    // autoBtn.disabled = true;
-    // autoBtn.innerText = "⏳ Đang gửi...";
-
-    // const f = new FormData();
-    // f.append("merchant_email", email.value);
-
-    // const r = await fetch("/auto-resend", {
-    //     method: "POST",
-    //     body: f
-    // });
-
-    // const d = await r.json();
-
-    // autoBtn.disabled = false;
-    // autoBtn.innerText = "🔥 Auto resend email mới nhất";
-
-    if (d.status === "success") {
-        showAlert(`Đã gửi lại email:\n${d.resent_subject}`);
-        loadLogs();
-    } else {
-        showAlert(d.message || "Không tìm thấy email");
-    }
-    }
-    function showAlert(msg, duration = 10000) {
-    const toast = document.getElementById("toast");
-    toast.innerText = msg;
-    toast.style.display = "block";
-
-    setTimeout(() => {
-        toast.style.display = "none";
-    }, duration);
 }
 
 async function loadLogs() {
     const r = await fetch("/logs");
     const d = await r.json();
-    const logList = document.getElementById("log-list");
-    logList.innerHTML = "";
+    const ul = document.getElementById("log-list");
+    ul.innerHTML = "";
 
     d.slice(-10).reverse().forEach(l => {
         const li = document.createElement("li");
         li.innerHTML = `
             <small>
-                ⏱ ${new Date(l.time).toLocaleString()} <br>
-                👤 ${l.user} <br>
-                📧 ${l.merchant_email} <br>
-                📨 ${l.subject}
-            </small>
-        `;
-        logList.appendChild(li);
+            ⏱ ${new Date(l.time).toLocaleString()}<br>
+            👤 ${l.user}<br>
+            📧 ${l.merchant_email}<br>
+            📨 ${l.subject}
+            </small>`;
+        ul.appendChild(li);
     });
 }
+
 loadLogs();
-    </script>
+</script>
+
 </body>
 </html>
